@@ -5,6 +5,7 @@ class Tokenizer:
     def __init__(self, vocab, merges, special_tokens=None):
         self.vocab = vocab
         self.merges = merges
+        self.merges_dict = {merges[i]:i for i in range(len(merges))}
         self.special_tokens = special_tokens
         # Build a mapping from byte tuples to token IDs
         self.byte_to_token = {byte: i for i, byte in self.vocab.items()}
@@ -32,17 +33,38 @@ class Tokenizer:
                 # Convert the word to byte tuples
                 word = tuple(bytes([byte]) for byte in word)
                 # Apply the merges
-                for merge in self.merges:
-                    i=0
-                    new_word = []
-                    while(i < len(word)):
-                        if word[i:i+2] == merge:
-                            new_word.append(merge[0]+merge[1])
-                            i+=2
-                        else:
-                            new_word.append(word[i])
-                            i+=1
-                    word = tuple(new_word)
+                # Enumerate the byte pairs
+                byte_pairs = []
+                for i in range(len(word)-1):
+                    byte_pairs.append(word[i:i+2])
+
+                while True:
+                    min_rank = len(self.merges)
+                    min_rank_byte_pair = None
+                    for byte_pair in byte_pairs:
+                        if byte_pair in self.merges_dict:
+                            if self.merges_dict[byte_pair] < min_rank:
+                                min_rank = self.merges_dict[byte_pair]
+                                min_rank_byte_pair = byte_pair
+                    if min_rank_byte_pair is not None:
+                        # Replace the byte pair with the merged byte
+                        i = 0
+                        new_word = []   
+                        while i < len(word):
+                            if word[i:i+2] == min_rank_byte_pair:
+                                new_word.append(min_rank_byte_pair[0]+min_rank_byte_pair[1])
+                                i+=2
+                            else:
+                                new_word.append(word[i])
+                                i+=1
+                        word = tuple(new_word)
+                        # Reenumerate the byte pairs
+                        byte_pairs = []
+                        for i in range(len(word)-1):
+                            byte_pairs.append(word[i:i+2])
+                        continue
+                    else:
+                        break
                 # Convert the word to a token ID
                 for byte in word:
                     if byte in self.byte_to_token:
