@@ -14,13 +14,17 @@ class Tokenizer:
 
     def encode(self, text: str) -> list[int]:
         # Step 1: Pre-tokenize
-        if self.special_tokens is None:
-            self.special_tokens = []
-        corpus = re.split(r"|".join("("+re.escape(token)+")" for token in self.special_tokens), text)
+        if self.special_tokens:
+            sorted_special_tokens = sorted(self.special_tokens, key=len, reverse=True)
+            corpus = re.split(r"|".join("("+re.escape(token)+")" for token in sorted_special_tokens), text)
+        else:
+            corpus = [text]
         tokens = []
         PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
         for chunk in corpus:
-            if chunk in self.special_tokens:
+            if chunk == "" or chunk is None:
+                continue
+            if self.special_tokens and chunk in self.special_tokens:
                 tokens.append(self.byte_to_token[chunk.encode("utf-8")])
                 continue
             for match in re.finditer(PAT, chunk):
@@ -52,4 +56,6 @@ class Tokenizer:
 
 
     def encode_iterable(self, iterable: Iterable[str]) -> Iterator[int]:
-        pass
+        for text in iterable:
+            for token in self.encode(text):
+                yield token
