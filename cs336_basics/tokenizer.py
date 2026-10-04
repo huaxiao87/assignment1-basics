@@ -47,7 +47,7 @@ class Tokenizer:
 
     def decode(self, ids: list[int]) -> str:
         # Convert the token IDs to bytes and then to a string
-        text = "".join([self.vocab[id].decode("utf-8") for id in ids])
+        text = b"".join([self.vocab[id] for id in ids]).decode("utf-8", errors="replace")
         return text
 
 
