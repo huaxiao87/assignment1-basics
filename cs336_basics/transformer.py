@@ -13,3 +13,11 @@ class Linear(torch.nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return einsum(self.W, x, "out_features in_features, ... in_features -> ... out_features")
+
+class Embedding(torch.nn.Module):
+    def __init__(self, vocab_size:int, d_model:int, device:torch.device=None, dtype:torch.dtype=None):
+        super().__init__()
+        pass
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        pass
