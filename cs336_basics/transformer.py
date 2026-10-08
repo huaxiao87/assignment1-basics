@@ -42,8 +42,7 @@ def silu( x: torch.Tensor) -> torch.Tensor:
 class SwiGLU(torch.nn.Module):
     def __init__(self, d_model: int, d_ff: int, device:torch.device=None, dtype:torch.dtype=None):
         super().__init__()
-        # # You should set d_ff to approximately 8/3×𝑑model in your implementation
-        # d_ff = int(8/3 * d_model)
+        # You should set d_ff to approximately 8/3×𝑑model in your implementation
         self.linear1 = Linear(d_model, d_ff, device=device, dtype=dtype)
         self.linear2 = Linear(d_ff, d_model, device=device, dtype=dtype)
         self.linear3 = Linear(d_model, d_ff, device=device, dtype=dtype)
@@ -54,6 +53,30 @@ class SwiGLU(torch.nn.Module):
 class RotaryPositionalEmbedding(torch.nn.Module):
     def __init__(self, theta: float, d_k: int, max_seq_len: int, device=None):
         super().__init__()
-    
+        self.theta = theta
+        self.d_k = d_k
+        self.max_seq_len = max_seq_len
+        positions = torch.arange(0, max_seq_len, device=device)
+        freqs = 1 / theta ** ((2 * torch.arange(0, d_k/2, device=device)) / d_k)
+        angles = positions.outer(freqs)
+        self.register_buffer("sin_cached", torch.sin(angles))
+        self.register_buffer("cos_cached", torch.cos(angles))
+        
+
     def forward(self, x: torch.Tensor, token_positions: torch.Tensor) -> torch.Tensor:
-        pass
+        sin = self.sin_cached[token_positions]
+        cos = self.cos_cached[token_positions]
+        rearranged_x = rearrange(x, "... (pairs two) -> ... pairs two", two=2)
+        # rotate each pair 
+        # build a batch of 2x2 rotation matrices for each pair
+        rotation_matrices = torch.stack([torch.stack([cos, -sin], dim=-1), torch.stack([sin, cos], dim=-1)], dim=-2)
+        # Rotate each pair
+        rotated_x = einsum(rearranged_x, rotation_matrices, "... pairs j, ... pairs i j -> ... pairs i")
+        # unrearrange
+        return rearrange(rotated_x, "... pairs two -> ... (pairs two)")
+
+def softmax(x: torch.Tensor, dim: int) -> torch.Tensor:
+    return torch.exp(x) / torch.exp(x).sum(dim=dim, keepdim=True)
+
+def dot_product_attention(query: torch.Tensor, key: torch.Tensor, value: torch.Tensor, mask: torch.Tensor=None) -> torch.Tensor:
+    pass
