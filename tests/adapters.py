@@ -30,7 +30,7 @@ def run_linear(
     Returns:
         Float[Tensor, "... d_out"]: The transformed output of your linear module.
     """
-    layer = linear.Linear(d_in, d_out)
+    layer = transformer.Linear(d_in, d_out)
     layer.W.data = weights
     return layer(in_features)
 
@@ -53,8 +53,9 @@ def run_embedding(
     Returns:
         Float[Tensor, "... d_model"]: Batch of embeddings returned by your Embedding layer.
     """
-
-    raise NotImplementedError
+    embedding = transformer.Embedding(vocab_size, d_model)
+    embedding.embedding_matrix.data = weights
+    return embedding(token_ids)
 
 
 def run_swiglu(
@@ -86,7 +87,11 @@ def run_swiglu(
     # swiglu.w1.weight.data = w1_weight
     # swiglu.w2.weight.data = w2_weight
     # swiglu.w3.weight.data = w3_weight
-    raise NotImplementedError
+    swiglu = transformer.SwiGLU(d_model, d_ff)
+    swiglu.linear1.W.data = w1_weight
+    swiglu.linear2.W.data = w2_weight
+    swiglu.linear3.W.data = w3_weight
+    return swiglu(in_features)
 
 
 def run_scaled_dot_product_attention(
@@ -381,8 +386,9 @@ def run_rmsnorm(
         Float[Tensor,"... d_model"]: Tensor of with the same shape as `in_features` with the output of running
         RMSNorm of the `in_features`.
     """
-    raise NotImplementedError
-
+    rms_norm = transformer.RMSNorm(d_model, eps)
+    rms_norm.g.data = weights
+    return rms_norm(in_features)
 
 def run_silu(in_features: Float[Tensor, " ..."]) -> Float[Tensor, " ..."]:
     """Given a tensor of inputs, return the output of applying SiLU
@@ -395,7 +401,7 @@ def run_silu(in_features: Float[Tensor, " ..."]) -> Float[Tensor, " ..."]:
         Float[Tensor,"..."]: of with the same shape as `in_features` with the output of applying
         SiLU to each element.
     """
-    raise NotImplementedError
+    return transformer.silu(in_features)
 
 
 def run_get_batch(
