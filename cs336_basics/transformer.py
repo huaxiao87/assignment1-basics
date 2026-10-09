@@ -88,3 +88,23 @@ def scaled_dot_product_attention(Q: torch.Tensor, K: torch.Tensor, V: torch.Tens
     if mask is not None:
         scores = scores.masked_fill(~mask, -float('inf'))
     return softmax(scores, dim=-1) @ V
+
+class CausalMultiHeadSelfAttention(torch.nn.Module):
+    def __init__(self, d_model: int, num_heads: int, device:torch.device=None, dtype:torch.dtype=None):
+        super().__init__()
+        self.d_model = d_model
+        self.num_heads = num_heads
+        self.head_dim = d_model // num_heads
+        self.Q = Linear(d_model, d_model, device=device, dtype=dtype)
+        self.K = Linear(d_model, d_model, device=device, dtype=dtype)
+        self.V = Linear(d_model, d_model, device=device, dtype=dtype)
+        self.O = Linear(d_model, d_model, device=device, dtype=dtype)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # Build the boolean mask for the causal self-attention
+        mask = torch.tril(torch.ones(x.shape[1], x.shape[1], device=x.device, dtype=torch.bool), diagonal=0)
+        # Split the input into multiple heads using einops
+        Q = rearrange(self.Q(x), "... seq_len (num_heads head_dim)-> ... num_heads seq_len head_dim", num_heads=self.num_heads, head_dim=self.head_dim)
+        K = rearrange(self.K(x), "... seq_len (num_heads head_dim)-> ... num_heads seq_len head_dim", num_heads=self.num_heads, head_dim=self.head_dim)
+        V = rearrange(self.V(x), "... seq_len (num_heads head_dim)-> ... num_heads seq_len head_dim", num_heads=self.num_heads, head_dim=self.head_dim)
+        return self.O(rearrange(scaled_dot_product_attention(Q, K, V, mask=mask), "... num_heads seq_len head_dim -> ... seq_len (num_heads head_dim)", num_heads=self.num_heads, head_dim=self.head_dim))
