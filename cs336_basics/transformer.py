@@ -62,7 +62,6 @@ class RotaryPositionalEmbedding(torch.nn.Module):
         self.register_buffer("sin_cached", torch.sin(angles))
         self.register_buffer("cos_cached", torch.cos(angles))
         
-
     def forward(self, x: torch.Tensor, token_positions: torch.Tensor) -> torch.Tensor:
         sin = self.sin_cached[token_positions]
         cos = self.cos_cached[token_positions]
@@ -111,7 +110,21 @@ class CausalMultiHeadSelfAttention(torch.nn.Module):
         K = rearrange(self.K(x), "... seq_len (num_heads head_dim)-> ... num_heads seq_len head_dim", num_heads=self.num_heads, head_dim=self.head_dim)
         V = rearrange(self.V(x), "... seq_len (num_heads head_dim)-> ... num_heads seq_len head_dim", num_heads=self.num_heads, head_dim=self.head_dim)
         if self.rope is not None:
+            if token_positions is None:
+                token_positions = torch.arange(0, x.shape[1], device=x.device)
             Q = self.rope(Q, token_positions=token_positions)
             K = self.rope(K, token_positions=token_positions)
         return self.O(rearrange(scaled_dot_product_attention(Q, K, V, mask=mask), "... num_heads seq_len head_dim -> ... seq_len (num_heads head_dim)", num_heads=self.num_heads, head_dim=self.head_dim))
 
+class TransformerBlock(torch.nn.Module):
+    def __init__(self, d_model: int, num_heads: int, d_ff: int, max_seq_len: int | None = None, theta: float | None = None, device:torch.device=None, dtype:torch.dtype=None):
+        super().__init__()
+        self.norm1 = RMSNorm(d_model, device=device, dtype=dtype)
+        self.attention = CausalMultiHeadSelfAttention(d_model, num_heads, max_seq_len, theta, device=device, dtype=dtype)
+        self.norm2 = RMSNorm(d_model, device=device, dtype=dtype)
+        self.ffn = SwiGLU(d_model, d_ff, device=device, dtype=dtype)
+
+    def forward(self, x: torch.Tensor, token_positions: torch.Tensor | None = None) -> torch.Tensor:
+        x = self.attention(self.norm1(x), token_positions=token_positions) + x
+        x = self.ffn(self.norm2(x)) + x
+        return x
