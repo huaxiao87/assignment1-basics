@@ -90,7 +90,7 @@ def scaled_dot_product_attention(Q: torch.Tensor, K: torch.Tensor, V: torch.Tens
     return softmax(scores, dim=-1) @ V
 
 class CausalMultiHeadSelfAttention(torch.nn.Module):
-    def __init__(self, d_model: int, num_heads: int, device:torch.device=None, dtype:torch.dtype=None):
+    def __init__(self, d_model: int, num_heads: int, max_seq_len: int | None = None, theta: float | None = None, device:torch.device=None, dtype:torch.dtype=None):
         super().__init__()
         self.d_model = d_model
         self.num_heads = num_heads
@@ -99,12 +99,19 @@ class CausalMultiHeadSelfAttention(torch.nn.Module):
         self.K = Linear(d_model, d_model, device=device, dtype=dtype)
         self.V = Linear(d_model, d_model, device=device, dtype=dtype)
         self.O = Linear(d_model, d_model, device=device, dtype=dtype)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if theta is not None and max_seq_len is not None:
+            self.rope = RotaryPositionalEmbedding(theta, self.head_dim, max_seq_len, device=device)
+        else:
+            self.rope = None
+    def forward(self, x: torch.Tensor, token_positions: torch.Tensor | None = None) -> torch.Tensor:
         # Build the boolean mask for the causal self-attention
         mask = torch.tril(torch.ones(x.shape[1], x.shape[1], device=x.device, dtype=torch.bool), diagonal=0)
         # Split the input into multiple heads using einops
         Q = rearrange(self.Q(x), "... seq_len (num_heads head_dim)-> ... num_heads seq_len head_dim", num_heads=self.num_heads, head_dim=self.head_dim)
         K = rearrange(self.K(x), "... seq_len (num_heads head_dim)-> ... num_heads seq_len head_dim", num_heads=self.num_heads, head_dim=self.head_dim)
         V = rearrange(self.V(x), "... seq_len (num_heads head_dim)-> ... num_heads seq_len head_dim", num_heads=self.num_heads, head_dim=self.head_dim)
+        if self.rope is not None:
+            Q = self.rope(Q, token_positions=token_positions)
+            K = self.rope(K, token_positions=token_positions)
         return self.O(rearrange(scaled_dot_product_attention(Q, K, V, mask=mask), "... num_heads seq_len head_dim -> ... seq_len (num_heads head_dim)", num_heads=self.num_heads, head_dim=self.head_dim))
+
