@@ -76,7 +76,15 @@ class RotaryPositionalEmbedding(torch.nn.Module):
         return rearrange(rotated_x, "... pairs two -> ... (pairs two)")
 
 def softmax(x: torch.Tensor, dim: int) -> torch.Tensor:
-    return torch.exp(x) / torch.exp(x).sum(dim=dim, keepdim=True)
+    # subtracting the maximum value in the 𝑖-th dimension from all elements of the 𝑖-th dimension to avoid numerical stability issues
+    x = x - x.max(dim=dim, keepdim=True).values
+    # apply softmax to the 𝑖-th dimension of the input tensor.
+    exp_x = torch.exp(x)
+    return exp_x / exp_x.sum(dim=dim, keepdim=True)
 
-def dot_product_attention(query: torch.Tensor, key: torch.Tensor, value: torch.Tensor, mask: torch.Tensor=None) -> torch.Tensor:
-    pass
+def scaled_dot_product_attention(Q: torch.Tensor, K: torch.Tensor, V: torch.Tensor, mask: torch.Tensor=None) -> torch.Tensor:
+    d_k = Q.shape[-1]   
+    scores = einsum(Q, K, "... Q d_k, ... K d_k -> ... Q K") / math.sqrt(d_k)
+    if mask is not None:
+        scores = scores.masked_fill(~mask, -float('inf'))
+    return softmax(scores, dim=-1) @ V
