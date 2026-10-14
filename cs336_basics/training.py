@@ -43,3 +43,34 @@ for t in range(100):
     print(loss.cpu().item())
     loss.backward() # Run backward pass, which computes gradients.
     opt.step() # Run optimizer step.
+
+class AdamW(torch.optim.Optimizer):
+    def __init__(self, params, lr=1e-3, betas=(0.9, 0.999), eps=1e-8, weight_decay=0):
+        defaults = {"lr": lr, "betas": betas, "eps": eps, "weight_decay": weight_decay}
+        super().__init__(params, defaults)
+    def step(self, closure: Optional[Callable] = None):
+        loss = None if closure is None else closure()
+        for group in self.param_groups:
+            lr = group["lr"]
+            betas = group["betas"]
+            eps = group["eps"]
+            weight_decay = group["weight_decay"]
+            for p in group["params"]:
+                if p.grad is None:
+                    continue
+                state = self.state[p]
+                if len(state) == 0:
+                    state["t"] = 0
+                    state["m"] = torch.zeros_like(p)
+                    state["v"] = torch.zeros_like(p)
+                m, v = state["m"], state["v"]
+                state["t"] += 1
+                bias_correction1 = 1 - betas[0] ** state["t"] # 1- beta1^t
+                bias_correction2 = 1 - betas[1] ** state["t"] # 1- beta2^t
+                lr_corrected = lr * math.sqrt(bias_correction2) / bias_correction1 # Corrected learning rate
+                if weight_decay != 0:
+                    p.data -= weight_decay * lr * p.data # Apply weight decay
+                m.mul_(betas[0]).add_(p.grad, alpha=1 - betas[0]) # Update the running average of the gradient
+                v.mul_(betas[1]).addcmul_(p.grad, p.grad, value=1 - betas[1]) # Update the running average of the squared gradient
+                p.data -= lr_corrected * m / (v.sqrt() + eps) # Update the parameters
+        return loss
