@@ -3,8 +3,7 @@ import cs336_basics.transformer as transformer
 from jaxtyping import Float, Int
 from torch import Tensor
 import math
-from typing import Optional, Callable
-
+from typing import Optional, Callable, Iterable
 def cross_entropy(inputs: Float[Tensor, " batch_size vocab_size"], targets: Int[Tensor, " batch_size"]) -> Float[Tensor, ""]:
     # Subtract the max logit from each logit
     logits = inputs - inputs.max(dim=-1, keepdim=True).values
@@ -82,3 +81,16 @@ def lr_cosine_schedule(t: int, lr_max: float, lr_min: float, warmup_iters: int, 
         return lr_min + 1/2 * (lr_max - lr_min) * (1 + math.cos(math.pi * (t - warmup_iters) / (cosine_cycle_iters - warmup_iters)))
     else:
         return lr_min
+
+def gradient_clipping(parameters: Iterable[torch.nn.Parameter], max_l2_norm: float) -> None:
+    l2_norm = 0.0
+    # materialize the generator into a list
+    parameters_list = list(parameters)
+    for p in parameters_list:
+        if p.grad is not None:
+            l2_norm += p.grad.data.norm()**2
+    l2_norm = math.sqrt(l2_norm)
+    if l2_norm > max_l2_norm:
+        for p in parameters_list:
+            if p.grad is not None:
+                p.grad.data.div_(l2_norm / max_l2_norm + 1e-6)
