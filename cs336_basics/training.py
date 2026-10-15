@@ -6,6 +6,7 @@ import math
 from typing import Optional, Callable, Iterable
 import numpy.typing as npt
 import numpy as np
+import os
 def cross_entropy(inputs: Float[Tensor, " batch_size vocab_size"], targets: Int[Tensor, " batch_size"]) -> Float[Tensor, ""]:
     # Subtract the max logit from each logit
     logits = inputs - inputs.max(dim=-1, keepdim=True).values
@@ -110,3 +111,16 @@ def get_batch(dataset: npt.NDArray, batch_size: int, context_length: int, device
     training_sequences = torch.tensor(dataset[training_sequences], device=device)
     target_sequences = torch.tensor(dataset[target_sequences], device=device)
     return training_sequences, target_sequences
+
+def save_checkpoint(model, optimizer, iteration, out: str):
+    torch.save({
+        "model": model.state_dict(),
+        "optimizer": optimizer.state_dict(),
+        "iteration": iteration,
+    }, out)
+
+def load_checkpoint(source: str, model, optimizer):
+    checkpoint = torch.load(source)
+    model.load_state_dict(checkpoint["model"])
+    optimizer.load_state_dict(checkpoint["optimizer"])
+    return checkpoint["iteration"]
