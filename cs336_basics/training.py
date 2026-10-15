@@ -107,6 +107,6 @@ def get_batch(dataset: npt.NDArray, batch_size: int, context_length: int, device
     # Combine the start indices and offsets to get the target sequences
     target_sequences = training_sequences + 1
     # Convert the training sequences and target sequences to tensors
-    training_sequences = torch.tensor(dataset[training_sequences.flatten()], device=device).reshape(batch_size, context_length)
-    target_sequences = torch.tensor(dataset[target_sequences.flatten()], device=device).reshape(batch_size, context_length)
+    training_sequences = torch.tensor(dataset[training_sequences], device=device)
+    target_sequences = torch.tensor(dataset[target_sequences], device=device)
     return training_sequences, target_sequences
