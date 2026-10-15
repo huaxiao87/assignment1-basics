@@ -4,6 +4,8 @@ from jaxtyping import Float, Int
 from torch import Tensor
 import math
 from typing import Optional, Callable, Iterable
+import numpy.typing as npt
+import numpy as np
 def cross_entropy(inputs: Float[Tensor, " batch_size vocab_size"], targets: Int[Tensor, " batch_size"]) -> Float[Tensor, ""]:
     # Subtract the max logit from each logit
     logits = inputs - inputs.max(dim=-1, keepdim=True).values
@@ -94,3 +96,17 @@ def gradient_clipping(parameters: Iterable[torch.nn.Parameter], max_l2_norm: flo
         for p in parameters_list:
             if p.grad is not None:
                 p.grad.data.div_(l2_norm / max_l2_norm + 1e-6)
+
+def get_batch(dataset: npt.NDArray, batch_size: int, context_length: int, device: str) -> tuple[torch.Tensor, torch.Tensor]:
+    # Generate the start indices of the training sequences any 1≤i≤n−m gives a valid training sequence
+    start_indices = np.random.randint(0, len(dataset) - context_length, size=(batch_size,))
+    # Generate consecutive offsets of size (context_length)
+    offsets = np.arange(context_length)
+    # Combine the start indices and offsets to get the training sequences
+    training_sequences = start_indices.reshape(-1, 1) + offsets.reshape(1, -1)
+    # Combine the start indices and offsets to get the target sequences
+    target_sequences = training_sequences + 1
+    # Convert the training sequences and target sequences to tensors
+    training_sequences = torch.tensor(dataset[training_sequences.flatten()], device=device).reshape(batch_size, context_length)
+    target_sequences = torch.tensor(dataset[target_sequences.flatten()], device=device).reshape(batch_size, context_length)
+    return training_sequences, target_sequences
