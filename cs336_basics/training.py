@@ -116,7 +116,7 @@ def save_checkpoint(model, optimizer, iteration, out: str):
     torch.save({
         "model": model.state_dict(),
         "optimizer": optimizer.state_dict(),
-        "iteration": iteration,
+        "iteration": iteration, # To resume learning rate scheduling
     }, out)
 
 def load_checkpoint(source: str, model, optimizer):

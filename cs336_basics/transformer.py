@@ -128,3 +128,18 @@ class TransformerBlock(torch.nn.Module):
         x = self.attention(self.norm1(x), token_positions=token_positions) + x
         x = self.ffn(self.norm2(x)) + x
         return x
+
+class TransformerLM(torch.nn.Module):
+    def __init__(self, vocab_size: int, d_model: int, num_layers: int, num_heads: int, d_ff: int, max_seq_len: int | None = None, theta: float | None = None, device:torch.device=None, dtype:torch.dtype=None):
+        super().__init__()
+        self.embedding = Embedding(vocab_size, d_model, device=device, dtype=dtype)
+        self.layers = torch.nn.ModuleList([TransformerBlock(d_model, num_heads, d_ff, max_seq_len, theta, device=device, dtype=dtype) for _ in range(num_layers)])
+        self.norm = RMSNorm(d_model, device=device, dtype=dtype)
+        self.linear = Linear(d_model, vocab_size, device=device, dtype=dtype)
+
+    def forward(self, x: torch.Tensor, token_positions: torch.Tensor | None = None) -> torch.Tensor:
+        x = self.embedding(x)
+        for layer in self.layers:
+            x = layer(x, token_positions=token_positions)
+        x = self.norm(x)
+        return self.linear(x)
